@@ -1,3 +1,5 @@
+import * as vscode from 'vscode';
+
 /**
  * Find the nearest ancestor between two paths and the number of folders
  * between them
@@ -30,4 +32,19 @@ export function findAncestor(path1: string, path2: string) {
     }
   
     return { parentLevel: parents1.length, ancestor: "/" };
+}
+
+export async function findNearestFiles(file: vscode.Uri, buildFileGlob: string) {
+	const foundBuildFiles = await vscode.workspace.findFiles(buildFileGlob);
+	const buildFilesAncestors = foundBuildFiles.map((mk) =>
+        ({ parentLevel: findAncestor(mk.path, file.path).parentLevel, path: mk })
+    );
+	
+	const sortedBuildFiles = buildFilesAncestors.sort((a, b) =>
+        (a.parentLevel === b.parentLevel) ? 0
+			: ((a.parentLevel < b.parentLevel) ? 1
+				: -1)
+    );
+
+	return sortedBuildFiles.map((entry) => entry.path);
 }

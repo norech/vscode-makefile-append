@@ -11,7 +11,8 @@
 		"Other"
 	],
 	"activationEvents": [
-		"onCommand:makefile-append.appendToMakefile"
+		"onCommand:makefile-append.appendToMakefile",
+		"onCommand:makefile-append.appendToCMakeLists"
 	],
 	"main": "./out/extension.js",
 	"contributes": {
@@ -19,6 +20,10 @@
 			{
 				"command": "makefile-append.appendToMakefile",
 				"title": "Makefile Append: Append current file to Makefile"
+			},
+			{
+				"command": "makefile-append.appendToCMakeLists",
+				"title": "Makefile Append: Append current file to CMakeLists.txt"
 			}
 		]
 	},

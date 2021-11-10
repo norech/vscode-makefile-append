@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { dirname, relative } from 'path';
-import { findAncestor } from '../util';
+import { findNearestFiles } from '../util';
 
 /**
  * matches each variables with only source files in the makefile in the format "{KEY} ={ src/file1.c\\\nsrc/file2.c}" (groups are brackets)
@@ -15,20 +15,6 @@ export function getVariablesPositions(content: string) {
         rawFiles: match[2],
         range: { start: match.index!, end: match.index! + match[0].length }
     }));
-}
-
-export async function findNearestMakefiles(file: vscode.Uri) {
-	const foundMakefiles = await vscode.workspace.findFiles("**/Makefile");
-	const makeFilesAncestors = foundMakefiles.map((mk) => ({
-		parentLevel: findAncestor(mk.path, file.path).parentLevel,
-		path: mk
-	}));
-	
-	const sortedMakeFiles = makeFilesAncestors.sort((a, b) =>
-		(a.parentLevel === b.parentLevel) ? 0 : (
-			(a.parentLevel < b.parentLevel) ? 1 : -1));
-	
-	return sortedMakeFiles.map((entry) => entry.path);
 }
 
 export async function appendToMakefile(file: vscode.Uri, makefile: vscode.Uri) {
@@ -80,7 +66,7 @@ export async function appendToMakefileCommand() {
 	if (!editor) {
 		return;
 	}
-	const makefiles = await findNearestMakefiles(editor.document.uri);
+	const makefiles = await findNearestFiles(editor.document.uri, "**/Makefile");
 	let makefilePath: string | undefined = undefined;
 	
 	if (makefiles.length === 1) {
