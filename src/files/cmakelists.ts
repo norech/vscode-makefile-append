@@ -6,16 +6,17 @@ import { findNearestFiles } from '../util';
  * matches each variables with only source files in the cmakelists file in the format "set({KEY}{\n src/file1.c\nsrc/file2.c\n})" (groups are brackets)
  */
 export const HELLISH_VARIABLES_FINDER = /set\(([A-Za-z_]+)((?:\s+.*?\.(?:cpp|c|h|hpp))+\s*?)\)/mg;
-export const HELLISH_FILES_FINDER = /file\((?:GLOB_RECURSE )?([A-Za-z_]+)((?:\s+.*?\.(?:cpp|c|h|hpp))+\s*?)\)/mg;
+export const HELLISH_FILES_FINDER = /file\((GLOB |GLOB_RECURSE |)([A-Za-z_]+)((?:\s+.*?\.(?:cpp|c|h|hpp))+\s*?)\)/mg;
 
-export function getVariablesPositions(doc: vscode.TextDocument, content: string) {
+export function getSetPositions(doc: vscode.TextDocument, content: string) {
     const matches = [
         ...content.matchAll(HELLISH_VARIABLES_FINDER),
-        ...content.matchAll(HELLISH_FILES_FINDER)
     ];
     return matches.map((match) => ({
         match: match[0],
         key: match[1],
+        glob: false,
+        globRecurse: false,
         rawFiles: match[2],
         range: {
             start: {
@@ -28,6 +29,37 @@ export function getVariablesPositions(doc: vscode.TextDocument, content: string)
             }
         }
     }));
+}
+
+export function getFilesPositions(doc: vscode.TextDocument, content: string) {
+    const matches = [
+        ...content.matchAll(HELLISH_FILES_FINDER)
+    ];
+    return matches.map((match) => ({
+        match: match[0],
+        key: match[2],
+        glob: match[1] !== "",
+        globRecurse: match[1] === "GLOB_RECURSE ",
+        rawFiles: match[3],
+        range: {
+            start: {
+                index: match.index!,
+                pos: doc.positionAt(match.index!)
+            },
+            end: {
+                index: match.index! + match[0].length,
+                pos: doc.positionAt(match.index! + match[0].length)
+            }
+        }
+    }));
+}
+
+
+export function getVariablesPositions(doc: vscode.TextDocument, content: string) {
+    return [
+        ...getSetPositions(doc, content),
+        ...getFilesPositions(doc, content)
+    ];
 }
 
 export async function appendToCMakeLists(file: vscode.Uri, buildFile: vscode.Uri) {
@@ -75,24 +107,41 @@ export async function listCMakeListsRules(makefile: vscode.Uri) {
     const doc = await vscode.workspace.openTextDocument(makefile);
     const text = doc.getText();
     const positions = getVariablesPositions(doc, text);
-    vscode.window.showInformationMessage(JSON.stringify(positions));
-    return positions.map(p => {
+
+    const rules = await Promise.all(positions.map(async p => {
         let lines = p.rawFiles.replace("\r\n", "\n").replace(/\s+/g, "\n").replace(/\\$/, "").split("\n");
         lines = lines.filter(l => l.trim().length > 0 && !l.trim().includes("$"));
+
+        const files = await Promise.all(lines.map(async l => {
+            const filepath = l.trim();
+            const buildDir = dirname(makefile.fsPath);
+            const absolutePath = join(buildDir, filepath);
+            let relativePath = vscode.workspace.asRelativePath(absolutePath);
+            if (p.glob && absolutePath.includes("*")) {
+                if (p.globRecurse) {
+                    relativePath = relativePath.replace("**", "*").replace("*", "**");
+                }
+                return (await vscode.workspace.findFiles(relativePath)).map(f => ({
+                    name: relative(buildDir, f.fsPath),
+                    path: f
+                }));
+            }
+            return [
+                {
+                    name: filepath,
+                    path: vscode.Uri.parse(absolutePath)
+                }
+            ];
+        }));
+
         return {
             rule: p.key,
             range: p.range,
-            files: lines.map(l => {
-                const filepath = l.trim();
-                const buildFileDir = dirname(makefile.fsPath);
-                const absolutePath = join(buildFileDir, filepath);
-                return {
-                    name: filepath,
-                    path: vscode.Uri.parse(absolutePath)
-                };
-            })
+            files: files.reduce((p, c) => [...p, ...c])
         };
-    }).filter(p => p.files.length > 0);
+    }));
+
+    return rules.filter(p => p.files.length > 0);
 }
 
 export async function listCMakeLists() {
