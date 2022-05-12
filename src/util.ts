@@ -3,6 +3,7 @@ import * as vscode from 'vscode';
 /**
  * Find the nearest ancestor between two paths and the number of folders
  * between them
+ * the bigger the parentLevel, the better the match
  */
 export function findAncestor(path1: string, path2: string) {
     const parents1 = path1.split("/").reduce((arr, curr) => {
@@ -20,18 +21,29 @@ export function findAncestor(path1: string, path2: string) {
     }, [] as string[]);
   
     if (parents1[0] === parents2[0]) { // roots should be equals
-        for (let i = parents1.length - 1; i >= 0; i--) {
+        const length = Math.min(parents1.length, parents2.length);
+        let i = 0;
+        for (; i < length; i++) {
             // exit once path is different
             if (parents1[i] !== parents2[i]) {
                 return {
-                    parentLevel: parents1.length - i,
+                    parentLevel: i,
                     ancestor: parents1[i - 1],
                 };
             }
         }
+        return {
+            parentLevel: i,
+            ancestor: parents1[i - 1],
+        };
     }
   
-    return { parentLevel: parents1.length, ancestor: "/" };
+    return { parentLevel: 0, ancestor: "/" };
+}
+
+export async function hasBuildFile(buildFileGlob: string) {
+    const files = await vscode.workspace.findFiles(buildFileGlob);
+    return files.length > 0;
 }
 
 export async function findNearestFiles(file: vscode.Uri, buildFileGlob: string) {

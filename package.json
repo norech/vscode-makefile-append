@@ -12,20 +12,48 @@
 	],
 	"activationEvents": [
 		"onCommand:makefile-append.appendToMakefile",
-		"onCommand:makefile-append.appendToCMakeLists"
+		"onCommand:makefile-append.appendToCMakeLists",
+		"onCommand:makefile-append.appendToBuildFile",
+		"onView:buildFiles",
+		"onLanguage:Makefile",
+		"onLanguage:CMakeLists.txt",
+		"onLanguage:txt"
 	],
 	"main": "./out/extension.js",
 	"contributes": {
 		"commands": [
 			{
 				"command": "makefile-append.appendToMakefile",
-				"title": "Makefile Append: Append current file to Makefile"
+				"title": "Append to Makefile"
 			},
 			{
 				"command": "makefile-append.appendToCMakeLists",
-				"title": "Makefile Append: Append current file to CMakeLists.txt"
+				"title": "Append to CMakeLists.txt"
+			},
+			{
+				"command": "makefile-append.appendToBuildFile",
+				"title": "Append to build file"
+			},
+			{
+				"command": "makefile-append.refreshBuildFilesTree",
+				"title": "Makefile Append: Refresh build files tree"
 			}
-		]
+		],
+        "menus": {
+            "explorer/context": [{
+                "when": "resourceLangId == c || resourceLangId == cpp",
+                "command": "makefile-append.appendToBuildFile",
+                "group": "navigation"
+            }]
+        },
+		"views": {
+			"explorer": [
+				{
+					"id": "buildFiles",
+					"name": "Build Files"
+				}
+			]
+		}
 	},
 	"scripts": {
 		"vscode:prepublish": "npm run compile",

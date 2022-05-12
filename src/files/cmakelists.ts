@@ -1,26 +1,39 @@
 import * as vscode from 'vscode';
-import { dirname, relative } from 'path';
+import { dirname, join, relative } from 'path';
 import { findNearestFiles } from '../util';
 
 /**
  * matches each variables with only source files in the cmakelists file in the format "set({KEY}{\n src/file1.c\nsrc/file2.c\n})" (groups are brackets)
  */
 export const HELLISH_VARIABLES_FINDER = /set\(([A-Za-z_]+)((?:\s+.*?\.(?:cpp|c|h|hpp))+\s*?)\)/mg;
+export const HELLISH_FILES_FINDER = /file\((?:GLOB_RECURSE )?([A-Za-z_]+)((?:\s+.*?\.(?:cpp|c|h|hpp))+\s*?)\)/mg;
 
-export function getVariablesPositions(content: string) {
-    const matches = [...content.matchAll(HELLISH_VARIABLES_FINDER)];
+export function getVariablesPositions(doc: vscode.TextDocument, content: string) {
+    const matches = [
+        ...content.matchAll(HELLISH_VARIABLES_FINDER),
+        ...content.matchAll(HELLISH_FILES_FINDER)
+    ];
     return matches.map((match) => ({
         match: match[0],
         key: match[1],
         rawFiles: match[2],
-        range: { start: match.index!, end: match.index! + match[0].length }
+        range: {
+            start: {
+                index: match.index!,
+                pos: doc.positionAt(match.index!)
+            },
+            end: {
+                index: match.index! + match[0].length,
+                pos: doc.positionAt(match.index! + match[0].length)
+            }
+        }
     }));
 }
 
 export async function appendToCMakeLists(file: vscode.Uri, buildFile: vscode.Uri) {
     const doc = await vscode.workspace.openTextDocument(buildFile);
     const text = doc.getText();
-    const positions = getVariablesPositions(text);
+    const positions = getVariablesPositions(doc, text);
     const selectionKey: string | undefined = await vscode.window.showQuickPick(
         positions.map(p => p.key), { title: "Select the variable to append into" }
     );
@@ -31,7 +44,7 @@ export async function appendToCMakeLists(file: vscode.Uri, buildFile: vscode.Uri
     const selection = positions.find(p => p.key === selectionKey)!;
     const lastWhitespaceOffset = selection.match.indexOf(selection.rawFiles)
         + getLastWhitespaceStartPos(selection.rawFiles);
-    const pos = doc.positionAt(selection.range.start + lastWhitespaceOffset);
+    const pos = doc.positionAt(selection.range.start.index + lastWhitespaceOffset);
     const editor = await vscode.window.showTextDocument(doc, 1, true);
     const eol = doc.eol === vscode.EndOfLine.LF ? "\n" : "\r\n";
     const newLine = eol;
@@ -52,18 +65,54 @@ export async function appendToCMakeLists(file: vscode.Uri, buildFile: vscode.Uri
         e.insert(pos, content);
 
         // move cursor to the end position
-        const endPos = doc.positionAt(selection.range.start + lastWhitespaceOffset);
+        const endPos = doc.positionAt(selection.range.start.index + lastWhitespaceOffset);
         editor.revealRange(new vscode.Range(endPos, endPos));
         editor.selection = new vscode.Selection(endPos, endPos);
     });
 }
 
-export async function appendToCMakeListsCommand() {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor) {
-        return;
+export async function listCMakeListsRules(makefile: vscode.Uri) {
+    const doc = await vscode.workspace.openTextDocument(makefile);
+    const text = doc.getText();
+    const positions = getVariablesPositions(doc, text);
+    vscode.window.showInformationMessage(JSON.stringify(positions));
+    return positions.map(p => {
+        let lines = p.rawFiles.replace("\r\n", "\n").replace(/\s+/g, "\n").replace(/\\$/, "").split("\n");
+        lines = lines.filter(l => l.trim().length > 0 && !l.trim().includes("$"));
+        return {
+            rule: p.key,
+            range: p.range,
+            files: lines.map(l => {
+                const filepath = l.trim();
+                const buildFileDir = dirname(makefile.fsPath);
+                const absolutePath = join(buildFileDir, filepath);
+                return {
+                    name: filepath,
+                    path: vscode.Uri.parse(absolutePath)
+                };
+            })
+        };
+    }).filter(p => p.files.length > 0);
+}
+
+export async function listCMakeLists() {
+    return (await vscode.workspace.findFiles("**/CMakeLists.txt")).sort((a, b) => {
+        const aDir = dirname(a.fsPath);
+        const bDir = dirname(b.fsPath);
+        return aDir.localeCompare(bDir);
+    });
+}
+
+export async function appendToCMakeListsCommand(path : string | undefined) {
+    if (path === undefined) {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+            return;
+        }
+        path = editor.document.uri.fsPath;
     }
-    const buildFiles = await findNearestFiles(editor.document.uri, "**/CMakeLists.txt");
+    const uri = vscode.Uri.parse(path);
+    const buildFiles = await findNearestFiles(uri, "**/CMakeLists.txt");
     let buildFilePath: string | undefined = undefined;
     
     if (buildFiles.length === 1) {
@@ -79,7 +128,7 @@ export async function appendToCMakeListsCommand() {
         return;
     }
     const buildFile = buildFiles.find((m) => m.path === buildFilePath)!;
-    appendToCMakeLists(editor.document.uri, buildFile);
+    appendToCMakeLists(uri, buildFile);
 }
 
 export function getLastWhitespaceStartPos(str: string) {
