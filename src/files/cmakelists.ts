@@ -5,8 +5,8 @@ import { findNearestFiles } from '../util';
 /**
  * matches each variables with only source files in the cmakelists file in the format "set({KEY}{\n src/file1.c\nsrc/file2.c\n})" (groups are brackets)
  */
-export const HELLISH_VARIABLES_FINDER = /set\(([A-Za-z_]+)((?:\s+.*?\.(?:cpp|c|h|hpp))+\s*?)\)/mg;
-export const HELLISH_FILES_FINDER = /file\((GLOB |GLOB_RECURSE |)([A-Za-z_]+)((?:\s+.*?\.(?:cpp|c|h|hpp))+\s*?)\)/mg;
+export const HELLISH_VARIABLES_FINDER = /set\(([A-Za-z_]+)((?:\s+.*?\.(?:cpp|hpp|c|h))+\s*?)\)/mg;
+export const HELLISH_FILES_FINDER = /file\((GLOB |GLOB_RECURSE |)([A-Za-z_]+)((?:\s+.*?\.(?:cpp|hpp|c|h))+\s*?)\)/mg;
 
 export function getSetPositions(doc: vscode.TextDocument, content: string) {
     const matches = [
@@ -88,7 +88,7 @@ export async function appendToCMakeLists(file: vscode.Uri, buildFile: vscode.Uri
         const rawFilesOffset = selection.match.indexOf(selection.rawFiles);
         indentation = " ".repeat(rawFilesOffset + 1); // repeat until it is aligned
     } else {
-        const prevLine = lines[lines.length - 1];
+        const prevLine = lines[lines.length - 2]; // off by one
         indentation += /^\s*/.exec(prevLine)![0]; // copy existing indentation
     }
     editor.edit((e) => {

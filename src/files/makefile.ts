@@ -5,7 +5,7 @@ import { findNearestFiles } from '../util';
 /**
  * matches each variables with only source files in the makefile in the format "{KEY} ={ src/file1.c\\\nsrc/file2.c}" (groups are brackets)
  */
-export const HELLISH_VARIABLES_FINDER = /([a-zA-Z_]+?)(?:\t| )*?=((?:(?:\t| )+.+?\.(?:c|cpp|h|hpp)(?:\t| )*?(?:\\(?:\r\n|\n))+)*(?:(?:\t| )*?.+?\.(?:c|cpp|h|hpp)(?:(?:\t| )\\)?))/mg;
+export const HELLISH_VARIABLES_FINDER = /([a-zA-Z_]+?)(?:\t| )*?=((?:(?:\t| )+.+?\.(?:cpp|hpp|c|h)(?:\t| )*?(?:\\(?:\r\n|\n))+)*(?:(?:\t| )*?.+?\.(?:cpp|hpp|c|h)(?:(?:\t| )\\)?))/mg;
 
 export function getVariablesPositions(doc: vscode.TextDocument, content: string) {
     const matches = [...content.matchAll(HELLISH_VARIABLES_FINDER)];

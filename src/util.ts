@@ -27,7 +27,7 @@ export function findAncestor(path1: string, path2: string) {
             // exit once path is different
             if (parents1[i] !== parents2[i]) {
                 return {
-                    parentLevel: i,
+                    parentLevel: parents1.length === i + 1 ? i + 1 : i,
                     ancestor: parents1[i - 1],
                 };
             }

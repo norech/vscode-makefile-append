@@ -5,7 +5,7 @@ import { appendToMakefileCommand } from './makefile';
 import { appendToCMakeListsCommand } from './cmakelists';
 
 const buildFileTypes = [
-    { key: "CMakeLists", filePattern: "**/CmakeLists.txt", append: appendToCMakeListsCommand },
+    { key: "CMakeLists", filePattern: "**/CMakeLists.txt", append: appendToCMakeListsCommand },
     { key: "Makefile",   filePattern: "**/Makefile",       append: appendToMakefileCommand }
 ];
 
